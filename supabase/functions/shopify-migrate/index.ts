@@ -158,138 +158,123 @@ async function migrateMetaobjects(src: any, tgt: any, defIds: string[], cm: stri
   return results;
 }
 
-// --- Metafield definitions migration ---
-// Maps GraphQL owner types to REST resources
-const OWNER_REST: Record<string, string | null> = {
-  PRODUCT: "products", COLLECTION: "collections", CUSTOMER: "customers",
-  ORDER: "orders", DRAFTORDER: "draft_orders", LOCATION: "locations",
-  PAGE: "pages", BLOG: "blogs", PRODUCTVARIANT: null, ARTICLE: null,
-  MARKET: null, SHOP: null,
-};
-
+// --- Metafield definitions migration (creates the DEFINITIONS in target shop) ---
 async function migrateMetafieldDefs(src: any, tgt: any, defKeys: string[], ownerType: string, cm: string, dry: boolean): Promise<Result[]> {
   const results: Result[] = [];
-  const restResource = OWNER_REST[ownerType];
 
-  // For types without REST mapping, use GraphQL-only approach
-  if (!restResource) {
-    // For SHOP-level metafields
-    if (ownerType === "SHOP") {
-      try {
-        const srcMf = await shopGet(src.url, src.token, `/admin/api/${V}/metafields.json`);
-        const metafields = srcMf?.metafields ?? [];
-        const selected = metafields.filter((mf: any) => defKeys.includes(`${mf.namespace}.${mf.key}`));
-        
-        if (selected.length === 0) {
-          results.push({ id: "shop", title: "Shop-Metafelder", status: "skipped", message: "Keine passenden Metafelder" });
-          return results;
+  // Fetch source definitions for this owner type
+  const srcQuery = `{
+    metafieldDefinitions(ownerType: ${ownerType}, first: 100) {
+      edges {
+        node {
+          id name namespace key
+          type { name }
+          description
+          ownerType
+          pinnedPosition
+          validations { name value }
         }
-
-        if (dry) {
-          results.push({ id: "shop", title: "Shop-Metafelder", status: "created", message: `Testlauf — ${selected.length} Metafelder` });
-          return results;
-        }
-
-        let tgtMf: any[] = [];
-        try { tgtMf = (await shopGet(tgt.url, tgt.token, `/admin/api/${V}/metafields.json`))?.metafields ?? []; } catch {}
-        
-        for (const mf of selected) {
-          const ex = tgtMf.find((t: any) => t.namespace === mf.namespace && t.key === mf.key);
-          if (ex && cm === "skip") { results.push({ id: mf.id, title: `${mf.namespace}.${mf.key}`, status: "skipped" }); continue; }
-          try {
-            if (ex && cm === "overwrite") {
-              await shopPut(tgt.url, tgt.token, `/admin/api/${V}/metafields/${ex.id}.json`, { metafield: { id: ex.id, value: mf.value, type: mf.type } });
-              results.push({ id: String(mf.id), title: `${mf.namespace}.${mf.key}`, status: "updated" });
-            } else if (!ex) {
-              await shopPost(tgt.url, tgt.token, `/admin/api/${V}/metafields.json`, { metafield: { namespace: mf.namespace, key: mf.key, value: mf.value, type: mf.type } });
-              results.push({ id: String(mf.id), title: `${mf.namespace}.${mf.key}`, status: "created" });
-            }
-          } catch (e: any) { results.push({ id: String(mf.id), title: `${mf.namespace}.${mf.key}`, status: "error", message: e.message }); }
-        }
-      } catch (e: any) { results.push({ id: "shop", title: "Shop-Metafelder", status: "error", message: e.message }); }
-      return results;
+      }
     }
+  }`;
+  const srcData = await gql(src.url, src.token, srcQuery);
+  const srcDefs = srcData?.data?.metafieldDefinitions?.edges?.map((e: any) => e.node) ?? [];
 
-    // For PRODUCTVARIANT, ARTICLE etc - use GraphQL
-    results.push({ id: ownerType, title: `Metafelder (${ownerType})`, status: "skipped", message: "Typ wird in einem zukünftigen Update via GraphQL unterstützt" });
+  // Fetch target definitions to check for existing
+  const tgtData = await gql(tgt.url, tgt.token, srcQuery);
+  const tgtDefs = tgtData?.data?.metafieldDefinitions?.edges?.map((e: any) => e.node) ?? [];
+
+  // Filter to selected keys (namespace.key format)
+  const selected = srcDefs.filter((d: any) => defKeys.includes(`${d.namespace}.${d.key}`));
+
+  if (selected.length === 0) {
+    results.push({ id: ownerType, title: `Metafeld-Definitionen (${ownerType})`, status: "skipped", message: "Keine passenden Definitionen gefunden" });
     return results;
   }
 
-  // REST-based approach for standard types
-  try {
-    // For collections, need to merge custom + smart
-    let srcItems: any[] = [];
-    if (restResource === "collections") {
-      const [cc, sc] = await Promise.all([
-        shopGet(src.url, src.token, `/admin/api/${V}/custom_collections.json?limit=250`).catch(() => ({ custom_collections: [] })),
-        shopGet(src.url, src.token, `/admin/api/${V}/smart_collections.json?limit=250`).catch(() => ({ smart_collections: [] })),
-      ]);
-      srcItems = [...(cc?.custom_collections ?? []), ...(sc?.smart_collections ?? [])];
-    } else {
-      const d = await shopGet(src.url, src.token, `/admin/api/${V}/${restResource}.json?limit=250`);
-      srcItems = d?.[restResource] ?? [];
+  for (const def of selected) {
+    const title = `${def.namespace}.${def.key} (${def.name})`;
+    const existing = tgtDefs.find((t: any) => t.namespace === def.namespace && t.key === def.key);
+
+    if (existing && cm === "skip") {
+      results.push({ id: def.id, title, status: "skipped", message: "Bereits vorhanden" });
+      continue;
     }
 
-    // Get target items for handle matching
-    let tgtItems: any[] = [];
-    if (restResource === "collections") {
-      const [cc, sc] = await Promise.all([
-        shopGet(tgt.url, tgt.token, `/admin/api/${V}/custom_collections.json?limit=250`).catch(() => ({ custom_collections: [] })),
-        shopGet(tgt.url, tgt.token, `/admin/api/${V}/smart_collections.json?limit=250`).catch(() => ({ smart_collections: [] })),
-      ]);
-      tgtItems = [...(cc?.custom_collections ?? []), ...(sc?.smart_collections ?? [])];
-    } else {
-      try { tgtItems = (await shopGet(tgt.url, tgt.token, `/admin/api/${V}/${restResource}.json?limit=250`))?.[restResource] ?? []; } catch {}
-    }
-
-    for (const item of srcItems) {
-      const itemTitle = item.title || item.name || item.handle || String(item.id);
-      const tgtItem = tgtItems.find((t: any) => t.handle === item.handle);
-
-      if (!tgtItem) continue; // Skip items without target match
-
-      // Fetch metafields
-      let metafields: any[] = [];
-      const mfEndpoint = restResource === "collections"
-        ? `/admin/api/${V}/collections/${item.id}/metafields.json`
-        : `/admin/api/${V}/${restResource}/${item.id}/metafields.json`;
-      try {
-        metafields = (await shopGet(src.url, src.token, mfEndpoint))?.metafields ?? [];
-      } catch { continue; }
-
-      const selected = metafields.filter((mf: any) => defKeys.includes(`${mf.namespace}.${mf.key}`));
-      if (selected.length === 0) continue;
-
+    if (existing && cm === "overwrite") {
+      // Update existing definition
       if (dry) {
-        results.push({ id: String(item.id), title: `${itemTitle}: ${selected.length} MF`, status: "created", message: "Testlauf" });
+        results.push({ id: def.id, title, status: "updated", message: "Testlauf" });
         continue;
       }
-
-      // Get target metafields
-      let tgtMf: any[] = [];
-      const tgtMfEndpoint = restResource === "collections"
-        ? `/admin/api/${V}/collections/${tgtItem.id}/metafields.json`
-        : `/admin/api/${V}/${restResource}/${tgtItem.id}/metafields.json`;
-      try { tgtMf = (await shopGet(tgt.url, tgt.token, tgtMfEndpoint))?.metafields ?? []; } catch {}
-
-      let created = 0, updated = 0, skipped = 0, errors = 0;
-      for (const mf of selected) {
-        const ex = tgtMf.find((t: any) => t.namespace === mf.namespace && t.key === mf.key);
-        if (ex && cm === "skip") { skipped++; continue; }
-        try {
-          if (ex && cm === "overwrite") {
-            await shopPut(tgt.url, tgt.token, `${tgtMfEndpoint.replace('.json', '')}/${ex.id}.json`, { metafield: { id: ex.id, value: mf.value, type: mf.type } });
-            updated++;
-          } else if (!ex) {
-            await shopPost(tgt.url, tgt.token, tgtMfEndpoint, { metafield: { namespace: mf.namespace, key: mf.key, value: mf.value, type: mf.type } });
-            created++;
+      try {
+        const updateMutation = `mutation($definition: MetafieldDefinitionUpdateInput!) {
+          metafieldDefinitionUpdate(definition: $definition) {
+            updatedDefinition { id }
+            userErrors { field message }
           }
-        } catch { errors++; }
+        }`;
+        const updateInput: any = {
+          namespace: def.namespace,
+          key: def.key,
+          ownerType: def.ownerType,
+          name: def.name,
+          description: def.description || undefined,
+        };
+        if (def.pinnedPosition != null) updateInput.pin = true;
+        const ur = await gql(tgt.url, tgt.token, updateMutation, { definition: updateInput });
+        const ue = ur?.data?.metafieldDefinitionUpdate?.userErrors;
+        if (ue?.length > 0) {
+          results.push({ id: def.id, title, status: "error", message: ue.map((e: any) => e.message).join(", ") });
+        } else {
+          results.push({ id: def.id, title, status: "updated" });
+        }
+      } catch (e: any) {
+        results.push({ id: def.id, title, status: "error", message: e.message });
       }
-      results.push({ id: String(item.id), title: `${itemTitle}`, status: errors > 0 ? "error" : "created", message: `${created}↑ ${updated}↻ ${skipped}⏭ ${errors}✗` });
+      continue;
     }
-  } catch (e: any) {
-    results.push({ id: ownerType, title: `Metafelder (${ownerType})`, status: "error", message: e.message });
+
+    if (existing) {
+      results.push({ id: def.id, title, status: "skipped", message: "Bereits vorhanden" });
+      continue;
+    }
+
+    // Create new definition
+    if (dry) {
+      results.push({ id: def.id, title, status: "created", message: "Testlauf" });
+      continue;
+    }
+
+    try {
+      const createMutation = `mutation($definition: MetafieldDefinitionInput!) {
+        metafieldDefinitionCreate(definition: $definition) {
+          createdDefinition { id }
+          userErrors { field message }
+        }
+      }`;
+      const createInput: any = {
+        name: def.name,
+        namespace: def.namespace,
+        key: def.key,
+        type: def.type.name,
+        ownerType: def.ownerType,
+        description: def.description || undefined,
+        pin: def.pinnedPosition != null,
+      };
+      if (def.validations?.length > 0) {
+        createInput.validations = def.validations.map((v: any) => ({ name: v.name, value: v.value }));
+      }
+      const cr = await gql(tgt.url, tgt.token, createMutation, { definition: createInput });
+      const ce = cr?.data?.metafieldDefinitionCreate?.userErrors;
+      if (ce?.length > 0) {
+        results.push({ id: def.id, title, status: "error", message: ce.map((e: any) => e.message).join(", ") });
+      } else {
+        results.push({ id: def.id, title, status: "created" });
+      }
+    } catch (e: any) {
+      results.push({ id: def.id, title, status: "error", message: e.message });
+    }
   }
 
   return results;
