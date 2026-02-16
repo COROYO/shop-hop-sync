@@ -24,13 +24,14 @@ export interface MigrationResponse {
 export async function migrateDataType(
   sourceShop: { url: string; token: string },
   targetShop: { url: string; token: string },
-  dataType: DataType,
+  dataType: DataType | "metafields",
   itemIds: string[],
   conflictMode: ConflictMode,
-  dryRun: boolean
+  dryRun: boolean,
+  metafieldsOwnerType?: string
 ): Promise<MigrationResponse> {
   const { data, error } = await supabase.functions.invoke("shopify-migrate", {
-    body: { sourceShop, targetShop, dataType, itemIds, conflictMode, dryRun },
+    body: { sourceShop, targetShop, dataType, itemIds, conflictMode, dryRun, metafieldsOwnerType },
   });
   if (error) throw new Error(error.message);
   return data as MigrationResponse;

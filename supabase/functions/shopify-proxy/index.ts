@@ -12,19 +12,52 @@ serve(async (req) => {
   }
 
   try {
-    const { shopUrl, accessToken, endpoint, method = "GET", body } = await req.json();
+    const { shopUrl, accessToken, endpoint, method = "GET", body, graphql } = await req.json();
 
-    if (!shopUrl || !accessToken || !endpoint) {
+    if (!shopUrl || !accessToken) {
       return new Response(
-        JSON.stringify({ error: "shopUrl, accessToken, and endpoint are required" }),
+        JSON.stringify({ error: "shopUrl and accessToken are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Sanitize shop URL
     const cleanUrl = shopUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
-    const url = `https://${cleanUrl}${endpoint}`;
 
+    // GraphQL mode
+    if (graphql) {
+      const url = `https://${cleanUrl}/admin/api/2024-01/graphql.json`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "X-Shopify-Access-Token": accessToken,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(graphql),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return new Response(
+          JSON.stringify({ error: `Shopify GraphQL error: ${response.status}`, details: errorText }),
+          { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const data = await response.json();
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // REST mode
+    if (!endpoint) {
+      return new Response(
+        JSON.stringify({ error: "endpoint is required for REST calls" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const url = `https://${cleanUrl}${endpoint}`;
     const response = await fetch(url, {
       method,
       headers: {

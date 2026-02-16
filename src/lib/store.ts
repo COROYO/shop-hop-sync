@@ -17,12 +17,14 @@ export interface MigrationState {
   selectedItems: Record<DataType, string[]>;
   conflictMode: ConflictMode;
   dryRun: boolean;
+  migrateMetafields: boolean;
   setSourceShop: (shop: Partial<ShopConnection>) => void;
   setTargetShop: (shop: Partial<ShopConnection>) => void;
   setSelectedDataTypes: (types: DataType[]) => void;
   setSelectedItems: (type: DataType, ids: string[]) => void;
   setConflictMode: (mode: ConflictMode) => void;
   setDryRun: (dryRun: boolean) => void;
+  setMigrateMetafields: (v: boolean) => void;
   reset: () => void;
 }
 
@@ -35,6 +37,7 @@ export const useMigrationStore = create<MigrationState>((set) => ({
   selectedItems: { products: [], collections: [], metaobjects: [], blogs: [], pages: [] },
   conflictMode: "skip",
   dryRun: false,
+  migrateMetafields: false,
   setSourceShop: (shop) => set((s) => ({ sourceShop: { ...s.sourceShop, ...shop } })),
   setTargetShop: (shop) => set((s) => ({ targetShop: { ...s.targetShop, ...shop } })),
   setSelectedDataTypes: (types) => set({ selectedDataTypes: types }),
@@ -42,6 +45,7 @@ export const useMigrationStore = create<MigrationState>((set) => ({
     set((s) => ({ selectedItems: { ...s.selectedItems, [type]: ids } })),
   setConflictMode: (mode) => set({ conflictMode: mode }),
   setDryRun: (dryRun) => set({ dryRun }),
+  setMigrateMetafields: (migrateMetafields) => set({ migrateMetafields }),
   reset: () =>
     set({
       sourceShop: { ...initialShop },
@@ -50,5 +54,6 @@ export const useMigrationStore = create<MigrationState>((set) => ({
       selectedItems: { products: [], collections: [], metaobjects: [], blogs: [], pages: [] },
       conflictMode: "skip",
       dryRun: false,
+      migrateMetafields: false,
     }),
 }));
