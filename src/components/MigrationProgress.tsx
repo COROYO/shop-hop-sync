@@ -1,11 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMigrationStore, DataType, METAFIELD_OWNER_TYPES } from "@/lib/store";
-import { migrateDataType, MigrationSummary } from "@/lib/migration-api";
+import { migrateDataType, MigrationSummary, MigrationResult } from "@/lib/migration-api";
+import { ConflictModal, ConflictItem } from "@/components/ConflictModal";
 import {
   Play,
   CheckCircle2,
@@ -19,7 +20,7 @@ import {
 interface LogEntry {
   timestamp: Date;
   item: string;
-  status: "created" | "updated" | "skipped" | "error" | "info";
+  status: "created" | "updated" | "skipped" | "error" | "info" | "conflict";
   message?: string;
 }
 
@@ -43,6 +44,13 @@ export function MigrationProgress() {
   const [completedSteps, setCompletedSteps] = useState(0);
   const [summary, setSummary] = useState<MigrationSummary>({ total: 0, created: 0, updated: 0, skipped: 0, errors: 0 });
 
+  // Conflict modal state
+  const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [conflictItems, setConflictItems] = useState<ConflictItem[]>([]);
+  const [conflictLabel, setConflictLabel] = useState("");
+  const conflictResolveRef = useRef<((decisions: Record<string, "overwrite" | "skip">) => void) | null>(null);
+  const conflictCancelRef = useRef<(() => void) | null>(null);
+
   const addLog = useCallback((entry: Omit<LogEntry, "timestamp">) => {
     setLogs((prev) => [...prev, { ...entry, timestamp: new Date() }]);
   }, []);
@@ -51,7 +59,6 @@ export function MigrationProgress() {
     (dt) => selectedItems[dt].length > 0
   );
 
-  // Metafield owner types that have selections
   const metafieldOwnerTypes = Object.entries(metafieldSelections)
     .filter(([, keys]) => keys.length > 0)
     .map(([ownerType]) => ownerType);
@@ -59,6 +66,122 @@ export function MigrationProgress() {
   const totalSelected = dataTypesToMigrate.reduce((a, dt) => a + selectedItems[dt].length, 0);
   const totalMetafields = metafieldOwnerTypes.reduce((a, ot) => a + (metafieldSelections[ot]?.length ?? 0), 0);
   const totalMigrationSteps = dataTypesToMigrate.length + metafieldOwnerTypes.length;
+
+  // Wait for user decisions on conflicts via a promise
+  const waitForConflictResolution = (conflicts: ConflictItem[], label: string): Promise<Record<string, "overwrite" | "skip"> | null> => {
+    return new Promise((resolve) => {
+      setConflictItems(conflicts);
+      setConflictLabel(label);
+      setConflictModalOpen(true);
+      conflictResolveRef.current = (decisions) => {
+        setConflictModalOpen(false);
+        resolve(decisions);
+      };
+      conflictCancelRef.current = () => {
+        setConflictModalOpen(false);
+        resolve(null);
+      };
+    });
+  };
+
+  const processMigrationStep = async (
+    label: string,
+    dataType: DataType | "metafield_definitions",
+    itemIds: string[],
+    ownerType?: string
+  ): Promise<MigrationSummary> => {
+    const stepSummary: MigrationSummary = { total: 0, created: 0, updated: 0, skipped: 0, errors: 0 };
+
+    try {
+      const res = await migrateDataType(
+        { url: sourceShop.url, token: sourceShop.token },
+        { url: targetShop.url, token: targetShop.token },
+        dataType,
+        itemIds,
+        conflictMode,
+        dryRun,
+        ownerType
+      );
+
+      // Separate conflicts from other results
+      const conflicts = res.results.filter((r) => r.status === "conflict");
+      const nonConflicts = res.results.filter((r) => r.status !== "conflict");
+
+      // Log non-conflict results
+      for (const r of nonConflicts) {
+        addLog({ item: r.title, status: r.status, message: r.message });
+      }
+
+      stepSummary.total += nonConflicts.length;
+      stepSummary.created += nonConflicts.filter((r) => r.status === "created").length;
+      stepSummary.updated += nonConflicts.filter((r) => r.status === "updated").length;
+      stepSummary.skipped += nonConflicts.filter((r) => r.status === "skipped").length;
+      stepSummary.errors += nonConflicts.filter((r) => r.status === "error").length;
+
+      // Handle conflicts
+      if (conflicts.length > 0) {
+        addLog({ item: label, status: "conflict", message: `${conflicts.length} Konflikte gefunden — warte auf Entscheidung...` });
+
+        const conflictData: ConflictItem[] = conflicts.map((c) => ({
+          id: c.id,
+          title: c.title,
+          sourceData: c.sourceData || {},
+          targetData: c.targetData || {},
+        }));
+
+        const decisions = await waitForConflictResolution(conflictData, label);
+
+        if (!decisions) {
+          // User cancelled — skip all conflicts
+          for (const c of conflicts) {
+            addLog({ item: c.title, status: "skipped", message: "Abgebrochen" });
+          }
+          stepSummary.skipped += conflicts.length;
+          stepSummary.total += conflicts.length;
+        } else {
+          const toOverwrite = Object.entries(decisions).filter(([, d]) => d === "overwrite").map(([id]) => id);
+          const toSkip = Object.entries(decisions).filter(([, d]) => d === "skip").map(([id]) => id);
+
+          // Log skipped
+          for (const id of toSkip) {
+            const c = conflicts.find((cc) => cc.id === id);
+            addLog({ item: c?.title ?? id, status: "skipped", message: "Manuell übersprungen" });
+          }
+          stepSummary.skipped += toSkip.length;
+          stepSummary.total += toSkip.length;
+
+          // Re-send overwrite items
+          if (toOverwrite.length > 0) {
+            addLog({ item: label, status: "info", message: `${toOverwrite.length} Einträge werden überschrieben...` });
+            const res2 = await migrateDataType(
+              { url: sourceShop.url, token: sourceShop.token },
+              { url: targetShop.url, token: targetShop.token },
+              dataType,
+              toOverwrite,
+              "overwrite",
+              dryRun,
+              ownerType
+            );
+            for (const r of res2.results) {
+              addLog({ item: r.title, status: r.status === "conflict" ? "skipped" : r.status, message: r.message });
+            }
+            stepSummary.total += res2.results.length;
+            stepSummary.created += res2.summary.created;
+            stepSummary.updated += res2.summary.updated;
+            stepSummary.skipped += res2.summary.skipped;
+            stepSummary.errors += res2.summary.errors;
+          }
+        }
+      }
+
+      addLog({ item: label, status: "info", message: `Fertig: ${stepSummary.created} erstellt, ${stepSummary.updated} aktualisiert, ${stepSummary.skipped} übersprungen, ${stepSummary.errors} Fehler` });
+    } catch (e: any) {
+      addLog({ item: label, status: "error", message: e.message });
+      stepSummary.errors += itemIds.length;
+    }
+
+    return stepSummary;
+  };
 
   const startMigration = useCallback(async () => {
     setRunning(true);
@@ -76,34 +199,15 @@ export function MigrationProgress() {
       const label = STATUS_LABELS[dt] || dt;
       setCurrentLabel(label);
       setProgress(Math.round((stepsDone / totalMigrationSteps) * 100));
-
       addLog({ item: label, status: "info", message: `Starte ${label}...` });
 
-      try {
-        const res = await migrateDataType(
-          { url: sourceShop.url, token: sourceShop.token },
-          { url: targetShop.url, token: targetShop.token },
-          dt,
-          selectedItems[dt],
-          conflictMode,
-          dryRun
-        );
+      const stepResult = await processMigrationStep(label, dt, selectedItems[dt]);
 
-        for (const r of res.results) {
-          addLog({ item: r.title, status: r.status, message: r.message });
-        }
-
-        globalSummary.total += res.summary.total;
-        globalSummary.created += res.summary.created;
-        globalSummary.updated += res.summary.updated;
-        globalSummary.skipped += res.summary.skipped;
-        globalSummary.errors += res.summary.errors;
-
-        addLog({ item: label, status: "info", message: `Fertig: ${res.summary.created} erstellt, ${res.summary.updated} aktualisiert, ${res.summary.skipped} übersprungen, ${res.summary.errors} Fehler` });
-      } catch (e: any) {
-        addLog({ item: label, status: "error", message: e.message });
-        globalSummary.errors += selectedItems[dt].length;
-      }
+      globalSummary.total += stepResult.total;
+      globalSummary.created += stepResult.created;
+      globalSummary.updated += stepResult.updated;
+      globalSummary.skipped += stepResult.skipped;
+      globalSummary.errors += stepResult.errors;
 
       stepsDone++;
       setCompletedSteps(stepsDone);
@@ -119,32 +223,13 @@ export function MigrationProgress() {
       const defKeys = metafieldSelections[ownerType] ?? [];
       addLog({ item: label, status: "info", message: `Starte ${defKeys.length} Metafelder...` });
 
-      try {
-        const res = await migrateDataType(
-          { url: sourceShop.url, token: sourceShop.token },
-          { url: targetShop.url, token: targetShop.token },
-          "metafield_definitions" as any,
-          defKeys,
-          conflictMode,
-          dryRun,
-          ownerType
-        );
+      const stepResult = await processMigrationStep(label, "metafield_definitions" as any, defKeys, ownerType);
 
-        for (const r of res.results) {
-          addLog({ item: r.title, status: r.status, message: r.message });
-        }
-
-        globalSummary.total += res.summary.total;
-        globalSummary.created += res.summary.created;
-        globalSummary.updated += res.summary.updated;
-        globalSummary.skipped += res.summary.skipped;
-        globalSummary.errors += res.summary.errors;
-
-        addLog({ item: label, status: "info", message: `Fertig: ${res.summary.created} erstellt, ${res.summary.updated} aktualisiert, ${res.summary.skipped} übersprungen, ${res.summary.errors} Fehler` });
-      } catch (e: any) {
-        addLog({ item: label, status: "error", message: e.message });
-        globalSummary.errors += defKeys.length;
-      }
+      globalSummary.total += stepResult.total;
+      globalSummary.created += stepResult.created;
+      globalSummary.updated += stepResult.updated;
+      globalSummary.skipped += stepResult.skipped;
+      globalSummary.errors += stepResult.errors;
 
       stepsDone++;
       setCompletedSteps(stepsDone);
@@ -164,6 +249,7 @@ export function MigrationProgress() {
       case "updated": return <RefreshCw className="h-3.5 w-3.5 text-warning" />;
       case "skipped": return <SkipForward className="h-3.5 w-3.5 text-muted-foreground" />;
       case "error": return <XCircle className="h-3.5 w-3.5 text-destructive" />;
+      case "conflict": return <AlertTriangle className="h-3.5 w-3.5 text-yellow-500" />;
       case "info": return <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />;
     }
   };
@@ -172,6 +258,14 @@ export function MigrationProgress() {
 
   return (
     <div className="space-y-4">
+      <ConflictModal
+        open={conflictModalOpen}
+        conflicts={conflictItems}
+        dataTypeLabel={conflictLabel}
+        onResolve={(decisions) => conflictResolveRef.current?.(decisions)}
+        onCancel={() => conflictCancelRef.current?.()}
+      />
+
       {finished && (
         <Card>
           <CardHeader className="pb-3">
