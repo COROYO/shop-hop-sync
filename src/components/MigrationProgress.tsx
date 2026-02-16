@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useMigrationStore, DataType } from "@/lib/store";
-import { migrateDataType, MigrationResult, MigrationSummary } from "@/lib/migration-api";
+import { useMigrationStore, DataType, METAFIELD_OWNER_TYPES } from "@/lib/store";
+import { migrateDataType, MigrationSummary } from "@/lib/migration-api";
 import {
   Play,
   CheckCircle2,
@@ -18,7 +18,6 @@ import {
 
 interface LogEntry {
   timestamp: Date;
-  dataType: DataType | "metafields";
   item: string;
   status: "created" | "updated" | "skipped" | "error" | "info";
   message?: string;
@@ -30,19 +29,15 @@ const STATUS_LABELS: Record<string, string> = {
   metaobjects: "Metaobjekte",
   blogs: "Blogs & Artikel",
   pages: "Pages",
-  metafields: "Metafelder",
 };
 
-// Data types that support metafields
-const METAFIELD_TYPES: DataType[] = ["products", "collections", "pages", "blogs"];
-
 export function MigrationProgress() {
-  const { sourceShop, targetShop, selectedItems, conflictMode, dryRun, migrateMetafields } = useMigrationStore();
+  const { sourceShop, targetShop, selectedItems, metafieldSelections, conflictMode, dryRun } = useMigrationStore();
 
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [currentType, setCurrentType] = useState<string | null>(null);
+  const [currentLabel, setCurrentLabel] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [totalSteps, setTotalSteps] = useState(0);
   const [completedSteps, setCompletedSteps] = useState(0);
@@ -56,13 +51,14 @@ export function MigrationProgress() {
     (dt) => selectedItems[dt].length > 0
   );
 
-  const totalSelected = dataTypesToMigrate.reduce((a, dt) => a + selectedItems[dt].length, 0);
+  // Metafield owner types that have selections
+  const metafieldOwnerTypes = Object.entries(metafieldSelections)
+    .filter(([, keys]) => keys.length > 0)
+    .map(([ownerType]) => ownerType);
 
-  // Calculate total steps: data types + metafield passes
-  const metafieldPasses = migrateMetafields
-    ? dataTypesToMigrate.filter((dt) => METAFIELD_TYPES.includes(dt) && selectedItems[dt].length > 0).length
-    : 0;
-  const totalMigrationSteps = dataTypesToMigrate.length + metafieldPasses;
+  const totalSelected = dataTypesToMigrate.reduce((a, dt) => a + selectedItems[dt].length, 0);
+  const totalMetafields = metafieldOwnerTypes.reduce((a, ot) => a + (metafieldSelections[ot]?.length ?? 0), 0);
+  const totalMigrationSteps = dataTypesToMigrate.length + metafieldOwnerTypes.length;
 
   const startMigration = useCallback(async () => {
     setRunning(true);
@@ -73,13 +69,15 @@ export function MigrationProgress() {
     const globalSummary: MigrationSummary = { total: 0, created: 0, updated: 0, skipped: 0, errors: 0 };
     let stepsDone = 0;
 
-    addLog({ dataType: "products", item: "Migration", status: "info", message: `${dryRun ? "Testlauf" : "Migration"} gestartet mit ${totalSelected} Einträgen${migrateMetafields ? " + Metafelder" : ""}` });
+    addLog({ item: "Migration", status: "info", message: `${dryRun ? "Testlauf" : "Migration"} gestartet — ${totalSelected} Einträge, ${totalMetafields} Metafelder` });
 
+    // Migrate data types
     for (const dt of dataTypesToMigrate) {
-      setCurrentType(dt);
+      const label = STATUS_LABELS[dt] || dt;
+      setCurrentLabel(label);
       setProgress(Math.round((stepsDone / totalMigrationSteps) * 100));
 
-      addLog({ dataType: dt, item: STATUS_LABELS[dt], status: "info", message: `Starte ${STATUS_LABELS[dt]}...` });
+      addLog({ item: label, status: "info", message: `Starte ${label}...` });
 
       try {
         const res = await migrateDataType(
@@ -92,7 +90,7 @@ export function MigrationProgress() {
         );
 
         for (const r of res.results) {
-          addLog({ dataType: dt, item: r.title, status: r.status, message: r.message });
+          addLog({ item: r.title, status: r.status, message: r.message });
         }
 
         globalSummary.total += res.summary.total;
@@ -101,60 +99,64 @@ export function MigrationProgress() {
         globalSummary.skipped += res.summary.skipped;
         globalSummary.errors += res.summary.errors;
 
-        addLog({ dataType: dt, item: STATUS_LABELS[dt], status: "info", message: `Abgeschlossen: ${res.summary.created} erstellt, ${res.summary.updated} aktualisiert, ${res.summary.skipped} übersprungen, ${res.summary.errors} Fehler` });
+        addLog({ item: label, status: "info", message: `Fertig: ${res.summary.created} erstellt, ${res.summary.updated} aktualisiert, ${res.summary.skipped} übersprungen, ${res.summary.errors} Fehler` });
       } catch (e: any) {
-        addLog({ dataType: dt, item: STATUS_LABELS[dt], status: "error", message: e.message });
+        addLog({ item: label, status: "error", message: e.message });
         globalSummary.errors += selectedItems[dt].length;
       }
 
       stepsDone++;
       setCompletedSteps(stepsDone);
+    }
 
-      // Metafields pass
-      if (migrateMetafields && METAFIELD_TYPES.includes(dt) && selectedItems[dt].length > 0) {
-        setCurrentType("metafields");
-        setProgress(Math.round((stepsDone / totalMigrationSteps) * 100));
+    // Migrate metafields by owner type
+    for (const ownerType of metafieldOwnerTypes) {
+      const ownerLabel = METAFIELD_OWNER_TYPES.find((ot) => ot.key === ownerType)?.label ?? ownerType;
+      const label = `Metafelder (${ownerLabel})`;
+      setCurrentLabel(label);
+      setProgress(Math.round((stepsDone / totalMigrationSteps) * 100));
 
-        addLog({ dataType: "metafields", item: `Metafelder (${STATUS_LABELS[dt]})`, status: "info", message: `Starte Metafelder für ${STATUS_LABELS[dt]}...` });
+      const defKeys = metafieldSelections[ownerType] ?? [];
+      addLog({ item: label, status: "info", message: `Starte ${defKeys.length} Metafelder...` });
 
-        try {
-          const mfRes = await migrateDataType(
-            { url: sourceShop.url, token: sourceShop.token },
-            { url: targetShop.url, token: targetShop.token },
-            "metafields",
-            selectedItems[dt],
-            conflictMode,
-            dryRun,
-            dt
-          );
+      try {
+        const res = await migrateDataType(
+          { url: sourceShop.url, token: sourceShop.token },
+          { url: targetShop.url, token: targetShop.token },
+          "metafield_definitions" as any,
+          defKeys,
+          conflictMode,
+          dryRun,
+          ownerType
+        );
 
-          for (const r of mfRes.results) {
-            addLog({ dataType: "metafields", item: r.title, status: r.status, message: r.message });
-          }
-
-          globalSummary.total += mfRes.summary.total;
-          globalSummary.created += mfRes.summary.created;
-          globalSummary.updated += mfRes.summary.updated;
-          globalSummary.skipped += mfRes.summary.skipped;
-          globalSummary.errors += mfRes.summary.errors;
-
-          addLog({ dataType: "metafields", item: `Metafelder (${STATUS_LABELS[dt]})`, status: "info", message: `Abgeschlossen: ${mfRes.summary.created} erstellt, ${mfRes.summary.updated} aktualisiert, ${mfRes.summary.skipped} übersprungen, ${mfRes.summary.errors} Fehler` });
-        } catch (e: any) {
-          addLog({ dataType: "metafields", item: `Metafelder (${STATUS_LABELS[dt]})`, status: "error", message: e.message });
+        for (const r of res.results) {
+          addLog({ item: r.title, status: r.status, message: r.message });
         }
 
-        stepsDone++;
-        setCompletedSteps(stepsDone);
+        globalSummary.total += res.summary.total;
+        globalSummary.created += res.summary.created;
+        globalSummary.updated += res.summary.updated;
+        globalSummary.skipped += res.summary.skipped;
+        globalSummary.errors += res.summary.errors;
+
+        addLog({ item: label, status: "info", message: `Fertig: ${res.summary.created} erstellt, ${res.summary.updated} aktualisiert, ${res.summary.skipped} übersprungen, ${res.summary.errors} Fehler` });
+      } catch (e: any) {
+        addLog({ item: label, status: "error", message: e.message });
+        globalSummary.errors += defKeys.length;
       }
+
+      stepsDone++;
+      setCompletedSteps(stepsDone);
     }
 
     setProgress(100);
     setSummary(globalSummary);
     setRunning(false);
     setFinished(true);
-    setCurrentType(null);
-    addLog({ dataType: "products", item: "Migration", status: "info", message: `${dryRun ? "Testlauf" : "Migration"} abgeschlossen` });
-  }, [dataTypesToMigrate, sourceShop, targetShop, selectedItems, conflictMode, dryRun, totalSelected, addLog, migrateMetafields, totalMigrationSteps]);
+    setCurrentLabel(null);
+    addLog({ item: "Migration", status: "info", message: `${dryRun ? "Testlauf" : "Migration"} abgeschlossen` });
+  }, [dataTypesToMigrate, metafieldOwnerTypes, sourceShop, targetShop, selectedItems, metafieldSelections, conflictMode, dryRun, totalSelected, totalMetafields, addLog, totalMigrationSteps]);
 
   const statusIcon = (status: LogEntry["status"]) => {
     switch (status) {
@@ -165,6 +167,8 @@ export function MigrationProgress() {
       case "info": return <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground" />;
     }
   };
+
+  const canStart = totalSelected > 0 || totalMetafields > 0;
 
   return (
     <div className="space-y-4">
@@ -201,8 +205,8 @@ export function MigrationProgress() {
               <CardTitle className="text-lg">
                 {running ? "Migration läuft..." : "Fortschritt"}
               </CardTitle>
-              {running && currentType && (
-                <Badge variant="secondary">{STATUS_LABELS[currentType] || currentType}</Badge>
+              {running && currentLabel && (
+                <Badge variant="secondary" className="text-xs">{currentLabel}</Badge>
               )}
             </div>
           </CardHeader>
@@ -245,11 +249,11 @@ export function MigrationProgress() {
         <Button
           size="lg"
           className="w-full"
-          disabled={totalSelected === 0}
+          disabled={!canStart}
           onClick={startMigration}
         >
           <Play className="mr-2 h-4 w-4" />
-          {dryRun ? "Testlauf starten" : "Migration starten"} ({totalSelected} Einträge)
+          {dryRun ? "Testlauf starten" : "Migration starten"} ({totalSelected} Einträge{totalMetafields > 0 ? `, ${totalMetafields} MF` : ""})
         </Button>
       )}
 
