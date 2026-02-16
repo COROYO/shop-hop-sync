@@ -4,8 +4,10 @@ import { DataType, ConflictMode } from "@/lib/store";
 export interface MigrationResult {
   id: string;
   title: string;
-  status: "created" | "updated" | "skipped" | "error";
+  status: "created" | "updated" | "skipped" | "error" | "conflict";
   message?: string;
+  sourceData?: any;
+  targetData?: any;
 }
 
 export interface MigrationSummary {
@@ -14,6 +16,7 @@ export interface MigrationSummary {
   updated: number;
   skipped: number;
   errors: number;
+  conflicts?: number;
 }
 
 export interface MigrationResponse {

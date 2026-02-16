@@ -16,7 +16,7 @@ interface MigrateRequest {
   metafieldsOwnerType?: string;
 }
 
-type Result = { id: string; title: string; status: "created" | "updated" | "skipped" | "error"; message?: string };
+type Result = { id: string; title: string; status: "created" | "updated" | "skipped" | "error" | "conflict"; message?: string; sourceData?: any; targetData?: any };
 
 function clean(shopUrl: string) {
   return shopUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
@@ -97,7 +97,16 @@ async function migrateMetaobjects(src: any, tgt: any, defIds: string[], cm: stri
 
   for (const def of selected) {
     const existing = tgtDefs.find((t: any) => t.type === def.type);
-    if (!existing) {
+    if (existing) {
+      if (cm === "skip") { results.push({ id: def.id, title: `Def: ${def.name}`, status: "skipped", message: "Bereits vorhanden" }); }
+      else if (cm === "ask") { results.push({ id: def.id, title: `Def: ${def.name}`, status: "conflict", message: "Bereits vorhanden", sourceData: def, targetData: existing }); }
+      else if (!dry) {
+        // overwrite — skip definition update for metaobjects for now
+        results.push({ id: def.id, title: `Def: ${def.name}`, status: "skipped", message: "Bereits vorhanden" });
+      } else {
+        results.push({ id: def.id, title: `Def: ${def.name}`, status: "updated", message: "Testlauf" });
+      }
+    } else {
       if (dry) { results.push({ id: def.id, title: `Def: ${def.name}`, status: "created", message: "Testlauf" }); }
       else {
         try {
@@ -105,11 +114,11 @@ async function migrateMetaobjects(src: any, tgt: any, defIds: string[], cm: stri
           const fd = def.fieldDefinitions.map((f: any) => ({ key: f.key, name: f.name, type: f.type.name, required: f.required, description: f.description || undefined, validations: f.validations?.length > 0 ? f.validations : undefined }));
           const r = await gql(tgt.url, tgt.token, m, { d: { type: def.type, name: def.name, fieldDefinitions: fd, access: { storefront: "PUBLIC_READ" } } });
           const ue = r?.data?.metaobjectDefinitionCreate?.userErrors;
-          if (ue?.length > 0) { results.push({ id: def.id, title: `Def: ${def.name}`, status: "error", message: ue.map((e: any) => e.message).join(", ") }); continue; }
-          results.push({ id: def.id, title: `Def: ${def.name}`, status: "created" });
-        } catch (e: any) { results.push({ id: def.id, title: `Def: ${def.name}`, status: "error", message: e.message }); continue; }
+          if (ue?.length > 0) { results.push({ id: def.id, title: `Def: ${def.name}`, status: "error", message: ue.map((e: any) => e.message).join(", ") }); }
+          else { results.push({ id: def.id, title: `Def: ${def.name}`, status: "created" }); }
+        } catch (e: any) { results.push({ id: def.id, title: `Def: ${def.name}`, status: "error", message: e.message }); }
       }
-    } else { results.push({ id: def.id, title: `Def: ${def.name}`, status: "skipped", message: "Bereits vorhanden" }); }
+    }
 
     // Entries
     let cursor: string | null = null; let hasNext = true; const entries: any[] = [];
@@ -138,6 +147,7 @@ async function migrateMetaobjects(src: any, tgt: any, defIds: string[], cm: stri
       const title = `${def.name}: ${entry.handle || entry.id}`;
       const ex = tgtEntries.find((t: any) => t.handle === entry.handle);
       if (ex && cm === "skip") { results.push({ id: entry.id, title, status: "skipped", message: "Bereits vorhanden" }); continue; }
+      if (ex && cm === "ask") { results.push({ id: entry.id, title, status: "conflict", message: "Bereits vorhanden", sourceData: entry, targetData: ex }); continue; }
       if (dry) { results.push({ id: entry.id, title, status: ex ? "updated" : "created", message: "Testlauf" }); continue; }
       const fields = entry.fields?.filter((f: any) => f.value != null && f.value !== "").map((f: any) => ({ key: f.key, value: f.value })) ?? [];
       try {
@@ -198,6 +208,11 @@ async function migrateMetafieldDefs(src: any, tgt: any, defKeys: string[], owner
 
     if (existing && cm === "skip") {
       results.push({ id: def.id, title, status: "skipped", message: "Bereits vorhanden" });
+      continue;
+    }
+
+    if (existing && cm === "ask") {
+      results.push({ id: def.id, title, status: "conflict", message: "Bereits vorhanden", sourceData: def, targetData: existing });
       continue;
     }
 
@@ -303,6 +318,7 @@ serve(async (req) => {
         try {
           const ex = tgtAll.find((tp: any) => tp.handle === p.handle);
           if (ex && cm === "skip") { results.push({ id: String(p.id), title: t, status: "skipped", message: "Bereits vorhanden" }); continue; }
+          if (ex && cm === "ask") { results.push({ id: String(p.id), title: t, status: "conflict", message: "Bereits vorhanden", sourceData: { title: p.title, handle: p.handle, vendor: p.vendor, product_type: p.product_type, variants: p.variants?.length ?? 0, images: p.images?.length ?? 0 }, targetData: { title: ex.title, handle: ex.handle, vendor: ex.vendor, product_type: ex.product_type, variants: ex.variants?.length ?? 0, images: ex.images?.length ?? 0 } }); continue; }
           if (dry) { results.push({ id: String(p.id), title: t, status: ex ? "updated" : "created", message: "Testlauf" }); continue; }
           const c = cleanProduct(p);
           if (ex && cm === "overwrite") { await shopPut(tgt.url, tgt.token, `/admin/api/${V}/products/${ex.id}.json`, { product: c }); results.push({ id: String(p.id), title: t, status: "updated" }); }
@@ -325,6 +341,7 @@ serve(async (req) => {
         try {
           const ex = allTgt.find((tc: any) => tc.handle === col.handle);
           if (ex && cm === "skip") { results.push({ id: String(col.id), title: t, status: "skipped", message: "Bereits vorhanden" }); continue; }
+          if (ex && cm === "ask") { results.push({ id: String(col.id), title: t, status: "conflict", message: "Bereits vorhanden", sourceData: { title: col.title, handle: col.handle }, targetData: { title: ex.title, handle: ex.handle } }); continue; }
           if (dry) { results.push({ id: String(col.id), title: t, status: ex ? "updated" : "created", message: "Testlauf" }); continue; }
           const cl = cleanCollection(col);
           const ep = ct === "smart" ? "smart_collections" : "custom_collections";
@@ -343,6 +360,7 @@ serve(async (req) => {
         try {
           const ex = tgtAll.find((tp: any) => tp.handle === p.handle);
           if (ex && cm === "skip") { results.push({ id: String(p.id), title: t, status: "skipped", message: "Bereits vorhanden" }); continue; }
+          if (ex && cm === "ask") { results.push({ id: String(p.id), title: t, status: "conflict", message: "Bereits vorhanden", sourceData: { title: p.title, handle: p.handle, body_html: p.body_html?.substring(0, 200) }, targetData: { title: ex.title, handle: ex.handle, body_html: ex.body_html?.substring(0, 200) } }); continue; }
           if (dry) { results.push({ id: String(p.id), title: t, status: ex ? "updated" : "created", message: "Testlauf" }); continue; }
           const cl = cleanPage(p);
           if (ex && cm === "overwrite") { await shopPut(tgt.url, tgt.token, `/admin/api/${V}/pages/${ex.id}.json`, { page: cl }); results.push({ id: String(p.id), title: t, status: "updated" }); }
@@ -359,6 +377,7 @@ serve(async (req) => {
         try {
           const ex = tgtBlogs.find((tb: any) => tb.handle === blog.handle);
           if (dry) { results.push({ id: String(blog.id), title: t, status: ex ? "updated" : "created", message: "Testlauf" }); continue; }
+          if (ex && cm === "ask") { results.push({ id: String(blog.id), title: t, status: "conflict", message: "Bereits vorhanden", sourceData: { title: blog.title, handle: blog.handle }, targetData: { title: ex.title, handle: ex.handle } }); continue; }
           if (ex && cm === "skip") { results.push({ id: String(blog.id), title: t, status: "skipped", message: "Bereits vorhanden" }); continue; }
           let targetBlogId: number;
           if (ex) { targetBlogId = ex.id; results.push({ id: String(blog.id), title: t, status: "updated" }); }
@@ -383,6 +402,7 @@ serve(async (req) => {
       updated: results.filter(r => r.status === "updated").length,
       skipped: results.filter(r => r.status === "skipped").length,
       errors: results.filter(r => r.status === "error").length,
+      conflicts: results.filter(r => r.status === "conflict").length,
     };
 
     return new Response(JSON.stringify({ results, summary }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
