@@ -36,7 +36,7 @@ const TAB_CONFIG: { key: DataType; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function Dashboard() {
-  const { sourceShop, selectedItems, setSelectedItems, metafieldSelections } = useMigrationStore();
+  const { sourceShop, targetShop, selectedItems, setSelectedItems, metafieldSelections } = useMigrationStore();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -112,7 +112,7 @@ export default function Dashboard() {
             <div>
               <h1 className="text-xl font-bold tracking-tight">Shopify Migrator</h1>
               <p className="text-sm text-muted-foreground">
-                {sourceShop.name} → Ziel-Shop
+                {sourceShop.name} → {targetShop.name || "Ziel-Shop"}
               </p>
             </div>
           </div>
