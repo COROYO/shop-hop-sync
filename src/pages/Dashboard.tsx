@@ -12,6 +12,7 @@ import {
   fetchCollections,
   fetchPages,
   fetchBlogs,
+  fetchMetaobjects,
 } from "@/lib/shopify-api";
 import {
   ArrowLeft,
@@ -33,8 +34,7 @@ const TAB_CONFIG: { key: DataType; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function Dashboard() {
-  const { sourceShop, selectedItems, setSelectedItems } =
-    useMigrationStore();
+  const { sourceShop, selectedItems, setSelectedItems } = useMigrationStore();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -73,10 +73,7 @@ export default function Dashboard() {
             items = await fetchBlogs(url, token);
             break;
           case "metaobjects":
-            toast({
-              title: "Metaobjekte",
-              description: "Metaobjekte erfordern GraphQL — wird in einem zukünftigen Update unterstützt.",
-            });
+            items = await fetchMetaobjects(url, token);
             break;
         }
         setData((d) => ({ ...d, [type]: items }));
@@ -90,8 +87,6 @@ export default function Dashboard() {
   );
 
   const totalSelected = Object.values(selectedItems).reduce((a, b) => a + b.length, 0);
-
-
 
   if (!sourceShop.connected) {
     navigate("/");

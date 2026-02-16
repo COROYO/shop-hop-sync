@@ -3,9 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 interface ShopifyProxyRequest {
   shopUrl: string;
   accessToken: string;
-  endpoint: string;
+  endpoint?: string;
   method?: string;
   body?: unknown;
+  graphql?: { query: string; variables?: Record<string, unknown> };
 }
 
 export async function shopifyProxy(req: ShopifyProxyRequest) {
@@ -73,13 +74,62 @@ export async function fetchBlogs(shopUrl: string, accessToken: string) {
   return result;
 }
 
-export async function fetchMetaobjects(shopUrl: string, accessToken: string) {
-  // Metaobjects require GraphQL - we'll use a simplified REST approach
+// Fetch metaobject definitions via GraphQL
+export async function fetchMetaobjectDefinitions(shopUrl: string, accessToken: string) {
+  const query = `{
+    metaobjectDefinitions(first: 50) {
+      edges {
+        node {
+          id
+          name
+          type
+          fieldDefinitions {
+            key
+            name
+            type { name }
+            required
+            description
+          }
+        }
+      }
+    }
+  }`;
+
   const data = await shopifyProxy({
     shopUrl,
     accessToken,
-    endpoint: "/admin/api/2024-01/metaobjects.json?limit=250",
-    method: "GET",
+    graphql: { query },
   });
-  return data?.metaobjects ?? [];
+
+  const definitions = data?.data?.metaobjectDefinitions?.edges?.map((e: any) => e.node) ?? [];
+  // Fetch entry count for each definition
+  const result: any[] = [];
+  for (const def of definitions) {
+    const countQuery = `{
+      metaobjects(type: "${def.type}", first: 1) {
+        edges { node { id } }
+        pageInfo { hasNextPage }
+      }
+    }`;
+    const countData = await shopifyProxy({
+      shopUrl,
+      accessToken,
+      graphql: { query: countQuery },
+    });
+    const entryCount = countData?.data?.metaobjects?.edges?.length ?? 0;
+    result.push({
+      id: def.id,
+      title: def.name,
+      handle: def.type,
+      name: def.name,
+      type: def.type,
+      fieldDefinitions: def.fieldDefinitions,
+      _entryCount: entryCount > 0 ? "1+" : "0",
+    });
+  }
+  return result;
+}
+
+export async function fetchMetaobjects(shopUrl: string, accessToken: string) {
+  return fetchMetaobjectDefinitions(shopUrl, accessToken);
 }
