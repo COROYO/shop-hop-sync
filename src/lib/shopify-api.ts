@@ -14,6 +14,11 @@ export async function shopifyProxy(req: ShopifyProxyRequest) {
     body: req,
   });
   if (error) throw new Error(error.message);
+  // Check for GraphQL-level errors
+  if (req.graphql && data?.errors?.length > 0) {
+    const msg = data.errors.map((e: any) => e.message).join("; ");
+    throw new Error(msg);
+  }
   return data;
 }
 
