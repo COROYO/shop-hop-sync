@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useMigrationStore, DataType } from "@/lib/store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTypeTab } from "@/components/DataTypeTab";
+import { MetafieldsTab } from "@/components/MetafieldsTab";
 import { MigrationSettings } from "@/components/MigrationSettings";
 import { MigrationProgress } from "@/components/MigrationProgress";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
   BookOpen,
   Boxes,
   Repeat,
+  Tags,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -34,7 +36,7 @@ const TAB_CONFIG: { key: DataType; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function Dashboard() {
-  const { sourceShop, selectedItems, setSelectedItems } = useMigrationStore();
+  const { sourceShop, selectedItems, setSelectedItems, metafieldSelections } = useMigrationStore();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -55,6 +57,7 @@ export default function Dashboard() {
 
   const loadData = useCallback(
     async (type: DataType) => {
+      if (loading[type]) return;
       setLoading((l) => ({ ...l, [type]: true }));
       try {
         const { url, token } = sourceShop;
@@ -83,10 +86,17 @@ export default function Dashboard() {
         setLoading((l) => ({ ...l, [type]: false }));
       }
     },
-    [sourceShop, toast]
+    [sourceShop, toast, loading]
   );
 
   const totalSelected = Object.values(selectedItems).reduce((a, b) => a + b.length, 0);
+  const totalMetafields = Object.values(metafieldSelections).reduce((a, b) => a + b.length, 0);
+
+  const handleTabChange = (v: string) => {
+    if (v !== "metafields") {
+      loadData(v as DataType);
+    }
+  };
 
   if (!sourceShop.connected) {
     navigate("/");
@@ -108,6 +118,9 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="secondary">{totalSelected} ausgewählt</Badge>
+            {totalMetafields > 0 && (
+              <Badge variant="outline">{totalMetafields} Metafelder</Badge>
+            )}
             <Button variant="outline" size="sm" onClick={() => navigate("/")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Zurück
@@ -119,8 +132,8 @@ export default function Dashboard() {
       <main className="container py-6">
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <div>
-            <Tabs defaultValue="products" onValueChange={(v) => loadData(v as DataType)}>
-              <TabsList className="mb-4 w-full justify-start">
+            <Tabs defaultValue="products" onValueChange={handleTabChange}>
+              <TabsList className="mb-4 w-full justify-start flex-wrap">
                 {TAB_CONFIG.map((tab) => (
                   <TabsTrigger key={tab.key} value={tab.key} className="gap-2">
                     {tab.icon}
@@ -132,7 +145,17 @@ export default function Dashboard() {
                     )}
                   </TabsTrigger>
                 ))}
+                <TabsTrigger value="metafields" className="gap-2">
+                  <Tags className="h-4 w-4" />
+                  Metafelder
+                  {totalMetafields > 0 && (
+                    <Badge variant="default" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
+                      {totalMetafields}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               </TabsList>
+
               {TAB_CONFIG.map((tab) => (
                 <TabsContent key={tab.key} value={tab.key}>
                   <DataTypeTab
@@ -144,6 +167,10 @@ export default function Dashboard() {
                   />
                 </TabsContent>
               ))}
+
+              <TabsContent value="metafields">
+                <MetafieldsTab />
+              </TabsContent>
             </Tabs>
           </div>
 

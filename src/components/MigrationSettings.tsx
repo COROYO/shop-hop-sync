@@ -6,7 +6,7 @@ import { ConflictMode, useMigrationStore } from "@/lib/store";
 import { Settings2 } from "lucide-react";
 
 export function MigrationSettings() {
-  const { conflictMode, setConflictMode, dryRun, setDryRun, migrateMetafields, setMigrateMetafields } = useMigrationStore();
+  const { conflictMode, setConflictMode, dryRun, setDryRun } = useMigrationStore();
 
   return (
     <Card>
@@ -29,15 +29,6 @@ export function MigrationSettings() {
               <SelectItem value="ask">Nachfragen — bei jedem Konflikt entscheiden</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>Metafelder migrieren</Label>
-            <p className="text-sm text-muted-foreground">
-              Metafelder für jeden ausgewählten Eintrag mit übertragen
-            </p>
-          </div>
-          <Switch checked={migrateMetafields} onCheckedChange={setMigrateMetafields} />
         </div>
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">

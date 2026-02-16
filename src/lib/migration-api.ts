@@ -24,7 +24,7 @@ export interface MigrationResponse {
 export async function migrateDataType(
   sourceShop: { url: string; token: string },
   targetShop: { url: string; token: string },
-  dataType: DataType | "metafields",
+  dataType: DataType | "metafields" | "metafield_definitions",
   itemIds: string[],
   conflictMode: ConflictMode,
   dryRun: boolean,

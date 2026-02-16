@@ -75,7 +75,7 @@ export async function fetchBlogs(shopUrl: string, accessToken: string) {
 }
 
 // Fetch metaobject definitions via GraphQL
-export async function fetchMetaobjectDefinitions(shopUrl: string, accessToken: string) {
+export async function fetchMetaobjects(shopUrl: string, accessToken: string) {
   const query = `{
     metaobjectDefinitions(first: 50) {
       edges {
@@ -88,48 +88,74 @@ export async function fetchMetaobjectDefinitions(shopUrl: string, accessToken: s
             name
             type { name }
             required
-            description
           }
         }
       }
     }
   }`;
 
-  const data = await shopifyProxy({
-    shopUrl,
-    accessToken,
-    graphql: { query },
-  });
+  const data = await shopifyProxy({ shopUrl, accessToken, graphql: { query } });
 
   const definitions = data?.data?.metaobjectDefinitions?.edges?.map((e: any) => e.node) ?? [];
-  // Fetch entry count for each definition
+  
+  if (definitions.length === 0) return [];
+
+  // Fetch entry counts
   const result: any[] = [];
   for (const def of definitions) {
-    const countQuery = `{
-      metaobjects(type: "${def.type}", first: 1) {
-        edges { node { id } }
-        pageInfo { hasNextPage }
-      }
-    }`;
-    const countData = await shopifyProxy({
-      shopUrl,
-      accessToken,
-      graphql: { query: countQuery },
-    });
-    const entryCount = countData?.data?.metaobjects?.edges?.length ?? 0;
+    let entryInfo = "0 Einträge";
+    try {
+      const countQuery = `{
+        metaobjects(type: "${def.type}", first: 250) {
+          edges { node { id } }
+        }
+      }`;
+      const countData = await shopifyProxy({ shopUrl, accessToken, graphql: { query: countQuery } });
+      const count = countData?.data?.metaobjects?.edges?.length ?? 0;
+      entryInfo = `${count} Einträge`;
+    } catch { /* ignore */ }
+
     result.push({
       id: def.id,
       title: def.name,
       handle: def.type,
-      name: def.name,
+      name: `${def.name} (${entryInfo})`,
       type: def.type,
       fieldDefinitions: def.fieldDefinitions,
-      _entryCount: entryCount > 0 ? "1+" : "0",
     });
   }
   return result;
 }
 
-export async function fetchMetaobjects(shopUrl: string, accessToken: string) {
-  return fetchMetaobjectDefinitions(shopUrl, accessToken);
+// Fetch metafield definitions for a specific owner type via GraphQL
+export async function fetchMetafieldDefinitions(shopUrl: string, accessToken: string, ownerType: string) {
+  const query = `{
+    metafieldDefinitions(ownerType: ${ownerType}, first: 100) {
+      edges {
+        node {
+          id
+          name
+          namespace
+          key
+          type { name }
+          description
+          ownerType
+        }
+      }
+    }
+  }`;
+
+  const data = await shopifyProxy({ shopUrl, accessToken, graphql: { query } });
+  
+  return data?.data?.metafieldDefinitions?.edges?.map((e: any) => ({
+    id: `${e.node.namespace}.${e.node.key}`,
+    title: e.node.name,
+    name: e.node.name,
+    handle: `${e.node.namespace}.${e.node.key}`,
+    namespace: e.node.namespace,
+    key: e.node.key,
+    typeName: e.node.type?.name,
+    description: e.node.description,
+    ownerType: e.node.ownerType,
+  })) ?? [];
 }
