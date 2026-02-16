@@ -3,6 +3,7 @@ import { useMigrationStore, DataType } from "@/lib/store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTypeTab } from "@/components/DataTypeTab";
 import { MigrationSettings } from "@/components/MigrationSettings";
+import { MigrationProgress } from "@/components/MigrationProgress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
@@ -14,7 +15,6 @@ import {
 } from "@/lib/shopify-api";
 import {
   ArrowLeft,
-  Play,
   Package,
   FolderOpen,
   FileText,
@@ -33,7 +33,7 @@ const TAB_CONFIG: { key: DataType; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function Dashboard() {
-  const { sourceShop, selectedItems, setSelectedItems, conflictMode, dryRun } =
+  const { sourceShop, selectedItems, setSelectedItems } =
     useMigrationStore();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -91,16 +91,7 @@ export default function Dashboard() {
 
   const totalSelected = Object.values(selectedItems).reduce((a, b) => a + b.length, 0);
 
-  const handleStartMigration = () => {
-    if (totalSelected === 0) {
-      toast({ title: "Keine Daten ausgewählt", description: "Bitte wähle mindestens einen Eintrag aus." });
-      return;
-    }
-    toast({
-      title: dryRun ? "Testlauf gestartet" : "Migration gestartet",
-      description: `${totalSelected} Einträge werden ${dryRun ? "simuliert" : "migriert"}. Konfliktmodus: ${conflictMode}`,
-    });
-  };
+
 
   if (!sourceShop.connected) {
     navigate("/");
@@ -163,15 +154,7 @@ export default function Dashboard() {
 
           <aside className="space-y-6">
             <MigrationSettings />
-            <Button
-              size="lg"
-              className="w-full"
-              disabled={totalSelected === 0}
-              onClick={handleStartMigration}
-            >
-              <Play className="mr-2 h-4 w-4" />
-              {dryRun ? "Testlauf starten" : "Migration starten"}
-            </Button>
+            <MigrationProgress />
           </aside>
         </div>
       </main>
