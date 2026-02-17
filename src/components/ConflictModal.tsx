@@ -71,7 +71,7 @@ export function ConflictModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-warning" />
@@ -92,7 +92,7 @@ export function ConflictModal({
           </span>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0 max-h-[50vh]">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-3 pr-4">
             {conflicts.map((conflict) => {
               const isSelected = selected.has(conflict.id);
