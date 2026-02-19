@@ -4,7 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Search } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface DataItem {
   id: string | number;
@@ -21,7 +28,13 @@ interface Props {
   onRefresh: () => void;
 }
 
-export function DataTypeTab({ items, loading, selectedIds, onSelectionChange, onRefresh }: Props) {
+export function DataTypeTab({
+  items,
+  loading,
+  selectedIds,
+  onSelectionChange,
+  onRefresh,
+}: Props) {
   const [search, setSearch] = useState("");
 
   const filtered = items.filter((item) => {
@@ -29,11 +42,15 @@ export function DataTypeTab({ items, loading, selectedIds, onSelectionChange, on
     return label.toLowerCase().includes(search.toLowerCase());
   });
 
-  const allSelected = filtered.length > 0 && filtered.every((i) => selectedIds.includes(String(i.id)));
+  const allSelected =
+    filtered.length > 0 &&
+    filtered.every((i) => selectedIds.includes(String(i.id)));
 
   const toggleAll = () => {
     if (allSelected) {
-      onSelectionChange(selectedIds.filter((id) => !filtered.some((i) => String(i.id) === id)));
+      onSelectionChange(
+        selectedIds.filter((id) => !filtered.some((i) => String(i.id) === id)),
+      );
     } else {
       const newIds = new Set(selectedIds);
       filtered.forEach((i) => newIds.add(String(i.id)));
@@ -97,7 +114,11 @@ export function DataTypeTab({ items, loading, selectedIds, onSelectionChange, on
               {filtered.map((item) => {
                 const id = String(item.id);
                 return (
-                  <TableRow key={id} className="cursor-pointer" onClick={() => toggle(id)}>
+                  <TableRow
+                    key={id}
+                    className="cursor-pointer"
+                    onClick={() => toggle(id)}
+                  >
                     <TableCell>
                       <Checkbox checked={selectedIds.includes(id)} />
                     </TableCell>

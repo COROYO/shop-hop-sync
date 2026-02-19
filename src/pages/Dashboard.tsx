@@ -172,7 +172,7 @@ export default function Dashboard() {
                     {selectedItems[tab.key].length > 0 && (
                       <Badge
                         variant="default"
-                        className="ml-1 h-5 w-5 rounded-full p-0 text-xs"
+                        className="ml-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
                       >
                         {selectedItems[tab.key].length}
                       </Badge>
