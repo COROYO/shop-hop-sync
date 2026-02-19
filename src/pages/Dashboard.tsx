@@ -5,6 +5,7 @@ import { DataTypeTab } from "@/components/DataTypeTab";
 import { MetafieldsTab } from "@/components/MetafieldsTab";
 import { MigrationSettings } from "@/components/MigrationSettings";
 import { MigrationProgress } from "@/components/MigrationProgress";
+import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
@@ -180,6 +181,7 @@ export default function Dashboard() {
           </aside>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }
