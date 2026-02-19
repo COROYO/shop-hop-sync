@@ -12,7 +12,7 @@ export function Footer() {
         </a>
         <span className="text-border">|</span>
         <a
-          href="https://coroyo.de/impressum"
+          href="https://shrymp-commerce.com/impressum/"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-foreground transition-colors"
