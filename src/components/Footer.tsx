@@ -28,6 +28,10 @@ export function Footer() {
         >
           Shrymp Commerce 🦐
         </a>
+        <span className="text-border">|</span>
+        <span className="text-muted-foreground">
+          v{import.meta.env.VITE_APP_VERSION}
+        </span>
       </div>
     </footer>
   );
