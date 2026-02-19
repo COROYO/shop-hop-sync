@@ -19,10 +19,10 @@ export default function Setup() {
             <Repeat className="h-6 w-6 text-primary" />
             <div>
               <h1 className="text-xl font-bold tracking-tight">
-                Shopify Migrator
+                Shrymp's Shopify Migrator
               </h1>
               <p className="text-sm text-muted-foreground">
-                Shop-zu-Shop Datenmigration
+                Shop-zu-Shop Datenmigration easy gemacht.
               </p>
             </div>
           </div>

@@ -30,14 +30,32 @@ import { useToast } from "@/hooks/use-toast";
 
 const TAB_CONFIG: { key: DataType; label: string; icon: React.ReactNode }[] = [
   { key: "products", label: "Produkte", icon: <Package className="h-4 w-4" /> },
-  { key: "collections", label: "Collections", icon: <FolderOpen className="h-4 w-4" /> },
-  { key: "metaobjects", label: "Metaobjekte", icon: <Boxes className="h-4 w-4" /> },
-  { key: "blogs", label: "Blogs & Artikel", icon: <BookOpen className="h-4 w-4" /> },
+  {
+    key: "collections",
+    label: "Collections",
+    icon: <FolderOpen className="h-4 w-4" />,
+  },
+  {
+    key: "metaobjects",
+    label: "Metaobjekte",
+    icon: <Boxes className="h-4 w-4" />,
+  },
+  {
+    key: "blogs",
+    label: "Blogs & Artikel",
+    icon: <BookOpen className="h-4 w-4" />,
+  },
   { key: "pages", label: "Pages", icon: <FileText className="h-4 w-4" /> },
 ];
 
 export default function Dashboard() {
-  const { sourceShop, targetShop, selectedItems, setSelectedItems, metafieldSelections } = useMigrationStore();
+  const {
+    sourceShop,
+    targetShop,
+    selectedItems,
+    setSelectedItems,
+    metafieldSelections,
+  } = useMigrationStore();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -82,16 +100,26 @@ export default function Dashboard() {
         }
         setData((d) => ({ ...d, [type]: items }));
       } catch (e: any) {
-        toast({ title: "Fehler", description: e.message, variant: "destructive" });
+        toast({
+          title: "Fehler",
+          description: e.message,
+          variant: "destructive",
+        });
       } finally {
         setLoading((l) => ({ ...l, [type]: false }));
       }
     },
-    [sourceShop, toast, loading]
+    [sourceShop, toast, loading],
   );
 
-  const totalSelected = Object.values(selectedItems).reduce((a, b) => a + b.length, 0);
-  const totalMetafields = Object.values(metafieldSelections).reduce((a, b) => a + b.length, 0);
+  const totalSelected = Object.values(selectedItems).reduce(
+    (a, b) => a + b.length,
+    0,
+  );
+  const totalMetafields = Object.values(metafieldSelections).reduce(
+    (a, b) => a + b.length,
+    0,
+  );
 
   const handleTabChange = (v: string) => {
     if (v !== "metafields") {
@@ -111,7 +139,9 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <Repeat className="h-6 w-6 text-primary" />
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Shopify Migrator</h1>
+              <h1 className="text-xl font-bold tracking-tight">
+                Shrymp's Shopify Migrator
+              </h1>
               <p className="text-sm text-muted-foreground">
                 {sourceShop.name} → {targetShop.name || "Ziel-Shop"}
               </p>
@@ -140,7 +170,10 @@ export default function Dashboard() {
                     {tab.icon}
                     {tab.label}
                     {selectedItems[tab.key].length > 0 && (
-                      <Badge variant="default" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
+                      <Badge
+                        variant="default"
+                        className="ml-1 h-5 w-5 rounded-full p-0 text-xs"
+                      >
                         {selectedItems[tab.key].length}
                       </Badge>
                     )}
@@ -150,7 +183,10 @@ export default function Dashboard() {
                   <Tags className="h-4 w-4" />
                   Metafelder
                   {totalMetafields > 0 && (
-                    <Badge variant="default" className="ml-1 h-5 w-5 rounded-full p-0 text-xs">
+                    <Badge
+                      variant="default"
+                      className="ml-1 h-5 w-5 rounded-full p-0 text-xs"
+                    >
                       {totalMetafields}
                     </Badge>
                   )}
