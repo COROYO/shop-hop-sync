@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowRight, AlertTriangle } from "lucide-react";
 
@@ -92,8 +91,8 @@ export function ConflictModal({
           </span>
         </div>
 
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="space-y-3 pr-4">
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="space-y-3 pr-2">
             {conflicts.map((conflict) => {
               const isSelected = selected.has(conflict.id);
               const keys = allKeys(conflict.sourceData, conflict.targetData);
@@ -147,7 +146,7 @@ export function ConflictModal({
               );
             })}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="gap-2 pt-4">
           <Button variant="outline" onClick={onCancel}>

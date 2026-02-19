@@ -42,10 +42,10 @@ export default function Setup() {
           </p>
           <p className=" text-sm mt-2 text-muted-foreground">
             Dieses Tool speichert deine Access Tokens nicht. Es speichert nicht
-            mal die Store URL oder sonst irgendwas. Wir haben hier nichtmal ne
-            Datenbank hinterlegt. <br />
-            Wir haben kein Interesse an deinen Daten. Das Tool dient Entwicklern
-            und Entwicklerinnen und erleichtert ihnen die Arbeit.
+            mal die Store URL oder sonst irgendwas. <br />
+            Wir haben hier nichtmal ne Datenbank hinterlegt. <br />
+            Wir haben kein Interesse an deinen Daten. Das Tool dient
+            Entwicklerinnen und Entwicklern und erleichtert ihnen die Arbeit.
           </p>
         </div>
 

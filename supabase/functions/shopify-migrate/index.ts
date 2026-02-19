@@ -61,6 +61,9 @@ async function gql(url: string, token: string, query: string, variables?: Record
 }
 
 const V = "2024-01";
+const BATCH_SIZE = 200;
+const BATCH_DELAY_MS = 2000;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function cleanProduct(p: any) {
   const { id, admin_graphql_api_id, created_at, updated_at, published_at, ...rest } = p;
@@ -143,7 +146,9 @@ async function migrateMetaobjects(src: any, tgt: any, defIds: string[], cm: stri
       } catch { th = false; }
     }
 
-    for (const entry of entries) {
+    for (let _i = 0; _i < entries.length; _i++) {
+      if (_i > 0 && _i % BATCH_SIZE === 0) await sleep(BATCH_DELAY_MS);
+      const entry = entries[_i];
       const title = `${def.name}: ${entry.handle || entry.id}`;
       const ex = tgtEntries.find((t: any) => t.handle === entry.handle);
       if (ex && cm === "skip") { results.push({ id: entry.id, title, status: "skipped", message: "Bereits vorhanden" }); continue; }
@@ -202,7 +207,9 @@ async function migrateMetafieldDefs(src: any, tgt: any, defKeys: string[], owner
     return results;
   }
 
-  for (const def of selected) {
+  for (let _i = 0; _i < selected.length; _i++) {
+    if (_i > 0 && _i % BATCH_SIZE === 0) await sleep(BATCH_DELAY_MS);
+    const def = selected[_i];
     const title = `${def.namespace}.${def.key} (${def.name})`;
     const existing = tgtDefs.find((t: any) => t.namespace === def.namespace && t.key === def.key);
 
@@ -313,7 +320,9 @@ serve(async (req) => {
       const sel = all.filter((p: any) => itemIds.includes(String(p.id)));
       let tgtAll: any[] = [];
       try { tgtAll = (await shopGet(tgt.url, tgt.token, `/admin/api/${V}/products.json?limit=250`))?.products ?? []; } catch {}
-      for (const p of sel) {
+      for (let _i = 0; _i < sel.length; _i++) {
+        if (_i > 0 && _i % BATCH_SIZE === 0) await sleep(BATCH_DELAY_MS);
+        const p = sel[_i];
         const t = p.title || String(p.id);
         try {
           const ex = tgtAll.find((tp: any) => tp.handle === p.handle);
@@ -336,7 +345,9 @@ serve(async (req) => {
       try { tc = (await shopGet(tgt.url, tgt.token, `/admin/api/${V}/custom_collections.json?limit=250`))?.custom_collections ?? []; } catch {}
       try { ts = (await shopGet(tgt.url, tgt.token, `/admin/api/${V}/smart_collections.json?limit=250`))?.smart_collections ?? []; } catch {}
       const allTgt = [...tc, ...ts];
-      for (const col of sel) {
+      for (let _i = 0; _i < sel.length; _i++) {
+        if (_i > 0 && _i % BATCH_SIZE === 0) await sleep(BATCH_DELAY_MS);
+        const col = sel[_i];
         const t = col.title || String(col.id); const ct = col._type;
         try {
           const ex = allTgt.find((tc: any) => tc.handle === col.handle);
@@ -355,7 +366,9 @@ serve(async (req) => {
       const sel = all.filter((p: any) => itemIds.includes(String(p.id)));
       let tgtAll: any[] = [];
       try { tgtAll = (await shopGet(tgt.url, tgt.token, `/admin/api/${V}/pages.json?limit=250`))?.pages ?? []; } catch {}
-      for (const p of sel) {
+      for (let _i = 0; _i < sel.length; _i++) {
+        if (_i > 0 && _i % BATCH_SIZE === 0) await sleep(BATCH_DELAY_MS);
+        const p = sel[_i];
         const t = p.title || String(p.id);
         try {
           const ex = tgtAll.find((tp: any) => tp.handle === p.handle);
@@ -372,7 +385,9 @@ serve(async (req) => {
       const sel = srcBlogs.filter((b: any) => itemIds.includes(String(b.id)));
       let tgtBlogs: any[] = [];
       try { tgtBlogs = (await shopGet(tgt.url, tgt.token, `/admin/api/${V}/blogs.json`))?.blogs ?? []; } catch {}
-      for (const blog of sel) {
+      for (let _i = 0; _i < sel.length; _i++) {
+        if (_i > 0 && _i % BATCH_SIZE === 0) await sleep(BATCH_DELAY_MS);
+        const blog = sel[_i];
         const t = blog.title || String(blog.id);
         try {
           const ex = tgtBlogs.find((tb: any) => tb.handle === blog.handle);
@@ -387,7 +402,9 @@ serve(async (req) => {
           }
           if (targetBlogId) {
             const arts = (await shopGet(src.url, src.token, `/admin/api/${V}/blogs/${blog.id}/articles.json?limit=250`))?.articles ?? [];
-            for (const a of arts) {
+            for (let _j = 0; _j < arts.length; _j++) {
+              if (_j > 0 && _j % BATCH_SIZE === 0) await sleep(BATCH_DELAY_MS);
+              const a = arts[_j];
               try { await shopPost(tgt.url, tgt.token, `/admin/api/${V}/blogs/${targetBlogId}/articles.json`, { article: cleanArticle(a) }); results.push({ id: String(a.id), title: `Artikel: ${a.title}`, status: "created" }); }
               catch (e: any) { results.push({ id: String(a.id), title: `Artikel: ${a.title}`, status: "error", message: e.message }); }
             }
