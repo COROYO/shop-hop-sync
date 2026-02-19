@@ -55,12 +55,26 @@ export default function Setup() {
             description="Der Shop, aus dem Daten gelesen werden"
             shop={sourceShop}
             onUpdate={setSourceShop}
+            scopes={[
+              "read_products",
+              "read_content",
+              "read_metaobject_definitions",
+              "read_metaobjects",
+              "read_metafield_definitions",
+            ]}
           />
           <ShopConnectionCard
             title="Ziel-Shop (B)"
             description="Der Shop, in den Daten geschrieben werden"
             shop={targetShop}
             onUpdate={setTargetShop}
+            scopes={[
+              "write_products",
+              "write_content",
+              "write_metaobject_definitions",
+              "write_metaobjects",
+              "write_metafield_definitions",
+            ]}
           />
         </div>
 

@@ -13,6 +13,7 @@ interface Props {
   description: string;
   shop: ShopConnection;
   onUpdate: (shop: Partial<ShopConnection>) => void;
+  scopes?: string[];
 }
 
 export function ShopConnectionCard({
@@ -20,6 +21,7 @@ export function ShopConnectionCard({
   description,
   shop,
   onUpdate,
+  scopes,
 }: Props) {
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +131,24 @@ export function ShopConnectionCard({
           )}
         </Button>
       </CardContent>
+      {scopes && scopes.length > 0 && (
+        <div className="border-t px-6 py-3">
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+            Benötigte Berechtigungen:
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {scopes.map((scope) => (
+              <Badge
+                key={scope}
+                variant="outline"
+                className="text-[10px] font-mono px-1.5 py-0"
+              >
+                {scope}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
