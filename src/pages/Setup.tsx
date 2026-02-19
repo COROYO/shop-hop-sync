@@ -6,7 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Repeat } from "lucide-react";
 
 export default function Setup() {
-  const { sourceShop, targetShop, setSourceShop, setTargetShop } = useMigrationStore();
+  const { sourceShop, targetShop, setSourceShop, setTargetShop } =
+    useMigrationStore();
   const navigate = useNavigate();
   const bothConnected = sourceShop.connected && targetShop.connected;
 
@@ -17,8 +18,12 @@ export default function Setup() {
           <div className="flex items-center gap-3">
             <Repeat className="h-6 w-6 text-primary" />
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Shopify Migrator</h1>
-              <p className="text-sm text-muted-foreground">Shop-zu-Shop Datenmigration</p>
+              <h1 className="text-xl font-bold tracking-tight">
+                Shopify Migrator
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Shop-zu-Shop Datenmigration
+              </p>
             </div>
           </div>
         </div>
@@ -28,7 +33,23 @@ export default function Setup() {
         <div className="mb-8 text-center">
           <h2 className="text-2xl font-bold">Shops verbinden</h2>
           <p className="mt-2 text-muted-foreground">
-            Verbinde deine Quell- und Ziel-Shops über deren Admin API Access Tokens
+            Verbinde deine Quell- und Ziel-Shops über deren Admin API Access
+            Tokens
+          </p>
+          <p>
+            Wenn du nicht weißt, wie du die Access Tokens bekommst, klicke{" "}
+            <a
+              href="https://help.shopify.com/en/manual/orders/api/get-access-tokens"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              hier
+            </a>{" "}
+            für eine Anleitung.
+          </p>
+          <p>
+            Wenn du keine Ahnung hast, wie du die Access Tokens bekommst, lass
+            es einfach. Das Tool ist nichts für dich.
           </p>
         </div>
 
