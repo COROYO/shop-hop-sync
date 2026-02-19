@@ -36,18 +36,7 @@ export default function Setup() {
             Verbinde deine Quell- und Ziel-Shops über deren Admin API Access
             Tokens
           </p>
-          <p>
-            Wenn du nicht weißt, wie du die Access Tokens bekommst, klicke{" "}
-            <a
-              href="https://help.shopify.com/en/manual/orders/api/get-access-tokens"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              hier
-            </a>{" "}
-            für eine Anleitung.
-          </p>
-          <p>
+          <p className="mt-2 text-muted-foreground">
             Wenn du keine Ahnung hast, wie du die Access Tokens bekommst, lass
             es einfach. Das Tool ist nichts für dich.
           </p>
