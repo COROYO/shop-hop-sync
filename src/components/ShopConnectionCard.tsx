@@ -15,7 +15,12 @@ interface Props {
   onUpdate: (shop: Partial<ShopConnection>) => void;
 }
 
-export function ShopConnectionCard({ title, description, shop, onUpdate }: Props) {
+export function ShopConnectionCard({
+  title,
+  description,
+  shop,
+  onUpdate,
+}: Props) {
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +47,10 @@ export function ShopConnectionCard({ title, description, shop, onUpdate }: Props
             <CardTitle className="text-lg">{title}</CardTitle>
           </div>
           {shop.connected ? (
-            <Badge variant="default" className="bg-success text-success-foreground">
+            <Badge
+              variant="default"
+              className="bg-success text-success-foreground"
+            >
               <CheckCircle2 className="mr-1 h-3 w-3" />
               Verbunden
             </Badge>
@@ -55,35 +63,44 @@ export function ShopConnectionCard({ title, description, shop, onUpdate }: Props
         <p className="text-sm text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form onSubmit={(e) => e.preventDefault()} autoComplete="off" data-lpignore="true" data-1p-ignore>
-        <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor={`${title}-url`}>Shop-URL</Label>
-          <Input
-            id={`${title}-url`}
-            placeholder="mein-shop.myshopify.com"
-            value={shop.url}
-            onChange={(e) => onUpdate({ url: e.target.value, connected: false })}
-            autoComplete="off"
-            data-1p-ignore
-            data-lpignore="true"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor={`${title}-token`}>Admin API Access Token</Label>
-          <Input
-            id={`${title}-token`}
-            type="text"
-            placeholder="shpat_..."
-            value={shop.token}
-            onChange={(e) => onUpdate({ token: e.target.value, connected: false })}
-            autoComplete="off"
-            data-1p-ignore
-            data-lpignore="true"
-            className="font-mono"
-          />
-        </div>
-        </div>
+        <form
+          onSubmit={(e) => e.preventDefault()}
+          autoComplete="off"
+          data-lpignore="true"
+          data-1p-ignore
+        >
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor={`${title}-url`}>Shop-URL</Label>
+              <Input
+                id={`${title}-url`}
+                placeholder="mein-shop.myshopify.com"
+                value={shop.url}
+                onChange={(e) =>
+                  onUpdate({ url: e.target.value, connected: false })
+                }
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${title}-token`}>Admin API Access Token</Label>
+              <Input
+                id={`${title}-token`}
+                type="text"
+                placeholder="shpat_..."
+                value={shop.token}
+                onChange={(e) =>
+                  onUpdate({ token: e.target.value, connected: false })
+                }
+                autoComplete="off"
+                data-1p-ignore
+                data-lpignore="true"
+                className="font-mono"
+              />
+            </div>
+          </div>
         </form>
         {shop.connected && shop.name && (
           <div className="rounded-md bg-accent p-3 text-sm">
