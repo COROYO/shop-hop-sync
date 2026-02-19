@@ -19,6 +19,15 @@ export function Footer() {
         >
           Impressum
         </a>
+        <span className="text-border">|</span>
+        <a
+          href="https://shrymp-commerce.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground transition-colors"
+        >
+          Shrymp Commerce 🦐
+        </a>
       </div>
     </footer>
   );
