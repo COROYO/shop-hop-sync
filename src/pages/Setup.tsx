@@ -1,4 +1,5 @@
 import { ShopConnectionCard } from "@/components/ShopConnectionCard";
+import { Footer } from "@/components/Footer";
 import { useMigrationStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -57,6 +58,7 @@ export default function Setup() {
           </Button>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }
