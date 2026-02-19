@@ -1,3 +1,5 @@
+import { Github } from "lucide-react";
+
 export function Footer() {
   return (
     <footer className="border-t bg-card py-4">
@@ -27,6 +29,16 @@ export function Footer() {
           className="hover:text-foreground transition-colors"
         >
           Shrymp Commerce 🦐
+        </a>
+        <span className="text-border">|</span>
+        <a
+          href="https://github.com/COROYO/shopify-data-migrator"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground transition-colors"
+          title="Open Source on GitHub"
+        >
+          <Github className="h-4 w-4" />
         </a>
         <span className="text-border">|</span>
         <span className="text-muted-foreground">

@@ -11,6 +11,12 @@ Shopify Shop-zu-Shop Datenmigration — kopiere Daten von Shop A nach Shop B per
 - Metaobjekt-Definitionen inkl. Metaobjekte
 - Metafeld-Definitionen
 
+## Roadmap
+
+Aufgrund von Feedback in den LinkedIn Kommentaren entwickeln wir an folgenden Features:
+
+- Mirgation von Produkt Bundles (Shopify eigene Bundles App)
+
 ## Datenschutz
 
 Es werden **keinerlei Daten gespeichert** — keine Keys, keine URLs, keine Shop-Daten. Alles läuft nur im Browser-Speicher und ist nach dem Schließen des Tabs weg.
