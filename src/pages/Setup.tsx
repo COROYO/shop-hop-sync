@@ -40,6 +40,13 @@ export default function Setup() {
             Wenn du keine Ahnung hast, wie du die Access Tokens bekommst, lass
             es einfach. Das Tool ist nichts für dich.
           </p>
+          <p className=" text-sm mt-2 text-muted-foreground">
+            Dieses Tool speichert deine Access Tokens nicht. Es speichert nicht
+            mal die Store URL oder sonst irgendwas. Wir haben hier nichtmal ne
+            Datenbank hinterlegt. <br />
+            Wir haben kein Interesse an deinen Daten. Das Tool dient Entwicklern
+            und Entwicklerinnen und erleichtert ihnen die Arbeit.
+          </p>
         </div>
 
         <div className="flex flex-col gap-6 md:flex-row">
